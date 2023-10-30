@@ -1,33 +1,53 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, url_for
 import mysql.connector
+import datetime
 
 app = Flask(__name__)
 
 # Configure MySQL database connection
 db_connection = mysql.connector.connect(
-    host='167.206.126.218',
-    user='syllabuddy-user',  
-    password='password', 
-    database='your_database'  # Replace with the name of your MySQL database
+    host='database-1.cqmz08yhaga0.us-east-2.rds.amazonaws.com',
+    user='admin_syllabuddy',  
+    password='zozRun-sopgu0-gysrip', 
+    database='syllabuddy'
 )
 
-# Endpoint for user registration (FIX DB/TABLE NAMES LATER)
+# Endpoint for user registration
 @app.route('/register', methods=['POST'])
 def register_user():
     data = request.get_json()
     cursor = db_connection.cursor()
 
-    # Define the SQL query to insert user data
-    insert_query = "INSERT INTO Users (email, password, role, university) VALUES (%s, %s, %s, %s)"
+    # Check if email or phone number already exist
+    check_query = """
+    SELECT COUNT(*) FROM Users
+    WHERE email = %s OR phoneNumber = %s
+    """
+    
+    cursor.execute(check_query, (data['email'], data['phoneNumber']))
+    result = cursor.fetchone()
+    if result and result[0] > 0:
+        # User with the same email or phone number already exists
+        cursor.close()
+        return jsonify({'error': 'An account already exists with this information. Please log in.'})
 
+    # If no existing user is found, proceed with registration
     try:
-        # Execute the SQL query with user data
-        cursor.execute(insert_query, (data['email'], data['password'], data['role'], data['university']))
-        db_connection.commit()  
+        registration_date = datetime.datetime.now()
+        insert_query = """
+        INSERT INTO Users (username, password, userType, lastName, firstName, email, phoneNumber, registrationDate)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(insert_query, (
+            data['username'], data['password'], data['userType'], 
+            data['lastName'], data['firstName'], data['email'], 
+            data['phoneNumber'], registration_date
+        ))
+        db_connection.commit()
         cursor.close()
         return jsonify({'message': 'User registered successfully'})
     except Exception as e:
         return jsonify({'error': str(e)})
-
+    
 if __name__ == '__main__':
     app.run()
