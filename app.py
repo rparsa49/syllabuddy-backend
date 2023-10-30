@@ -12,6 +12,11 @@ db_connection = mysql.connector.connect(
     database='syllabuddy'
 )
 
+# TODO: fill this out
+@app.route('/login', methods=['GET'])
+def login_user():
+    pass
+
 # Endpoint for user registration
 @app.route('/register', methods=['POST'])
 def register_user():
