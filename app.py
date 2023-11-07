@@ -139,5 +139,25 @@ def logout_user():
         return jsonify({'message': 'No user is currently logged in'})
 
 
+
+ # Endpoint for viewing favourite courses
+@app.route('/Viewfavouritecourses', methods=['GET', 'POST'])
+def View_Fav():
+     data = request.get_json()
+     cursor = db_connection.cursor()
+     if request.method == 'GET' : 
+        view_query = """
+        SELECT courseID FROM courseFavorite 
+        WHERE userID = 2
+        """
+        cursor.execute(view_query(
+            data.get('courseID','')
+
+        ))
+        db_connection.commit()
+        cursor.close()
+     else:
+          return jsonify({'message': 'not yet for post'}) 
+      
 if __name__ == '__main__':
     app.run()
