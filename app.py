@@ -150,12 +150,13 @@ def View_Fav():
         SELECT courseID FROM courseFavorite 
         WHERE userID = 2
         """
-        cursor.execute(view_query(
+        result = cursor.execute(view_query(
             data.get('courseID','')
 
         ))
         db_connection.commit()
         cursor.close()
+        return jsonify({'message' : result})
      else:
           return jsonify({'message': 'not yet for post'}) 
       
