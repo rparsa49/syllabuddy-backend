@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify 
 import mysql.connector
 import datetime
 from flask_cors import CORS
@@ -127,8 +127,8 @@ def register_user():
             raise BadRequest('An error occurred while registering the user: ' + str(e))
     except BadRequest:
         raise BadRequest('Invalid request data')
-
-# Endpoint to logout user and end their session
+    
+ # Endpoint for log out
 @app.route('/logout', methods=['POST'])
 def logout_user():
     if current_user.is_authenticated:
@@ -137,6 +137,35 @@ def logout_user():
         return jsonify({'message': 'User successfully logged out'})
     else:
         return jsonify({'message': 'No user is currently logged in'})
+    
+# Endpoint for search course 
+@app.route('/search', methods=['GET'])
+def search():
+    try:
+        data = request.get_json()
+
+        if not data:
+            raise BadRequest('Invalid request data')
+        cursor = db_connection.cursor()
+
+        try:
+            # Check if a user with the provided email exists
+            check_query = """
+            SELECT   u.firstName,   u.lastName,   c.courseCode,   c.courseName,   c.yearTerm 
+            FROM Users u 
+            LEFT JOIN Professor p ON u.userID = p.userID 
+            LEFT JOIN course c ON p.professorID = c.professorID 
+            WHERE c.courseName = %s;
+            """
+            cursor.execute(check_query)
+            result = cursor.fetchall()
+            cursor.close()
+        except Exception as e:
+            raise BadRequest('An error occurred while search ' + str(e))
+
+    except BadRequest:
+        raise BadRequest('Invalid request data')
+    return jsonify({'Courses:': result});
 
 
 if __name__ == '__main__':
