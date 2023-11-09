@@ -140,9 +140,10 @@ def logout_user():
 
 
 
- # Endpoint for viewing favourite courses
+ # Endpoint for viewing favourite courses 
 @app.route('/Viewfavouritecourses', methods=['GET', 'POST'])
 def View_Fav():
+     
      data = request.get_json()
      cursor = db_connection.cursor()
      if request.method == 'GET' : 
@@ -150,11 +151,9 @@ def View_Fav():
         SELECT courseID FROM courseFavorite 
         WHERE userID = 2
         """
-        result = cursor.execute(view_query(
-            data.get('courseID','')
-
-        ))
-        db_connection.commit()
+        result = cursor.execute(view_query(data.get('courseID')))
+        
+        
         cursor.close()
         return jsonify({'message' : result})
      else:
