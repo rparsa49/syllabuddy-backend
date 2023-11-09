@@ -140,7 +140,7 @@ def logout_user():
 
 
 
- # Endpoint for viewing favourite courses 
+ # Endpoint for viewing favourite courses change
 @app.route('/Viewfavouritecourses', methods=['GET', 'POST'])
 def View_Fav():
      
