@@ -139,7 +139,7 @@ def logout_user():
         return jsonify({'message': 'No user is currently logged in'})
     
 # Endpoint for search course 
-@app.route('/search', methods=['GET'])
+@app.route('/searchCourse', methods=['GET'])
 def search():
     try:
         data = request.get_json()
@@ -149,16 +149,21 @@ def search():
         cursor = db_connection.cursor()
 
         try:
-            # Check if a user with the provided email exists
+            # Check if the courseName match
             check_query = """
-            SELECT   u.firstName,   u.lastName,   c.courseCode,   c.courseName,   c.yearTerm 
+            SELECT   u.firstName,   u.lastName,   c.courseCode,   c.courseName,   c.yearTerm, u.universityID
             FROM Users u 
             LEFT JOIN Professor p ON u.userID = p.userID 
             LEFT JOIN course c ON p.professorID = c.professorID 
-            WHERE c.courseName = %s;
+            LEFT JOIN course c ON c.universityID = u.universityID 
+            WHERE c.courseName = %s and u.university = %s ;
             """
-            cursor.execute(check_query)
-            result = cursor.fetchall()
+            cursor.execute(check_query, (data.get('courseName', '')), (data.get('universityID', '')))
+            result = cursor.fetchone()
+
+            if result:
+                 firstName, lastName, courseCode, courseName, yearTerm, universityID = result
+
             cursor.close()
         except Exception as e:
             raise BadRequest('An error occurred while search ' + str(e))
