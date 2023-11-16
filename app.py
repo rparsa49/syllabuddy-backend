@@ -172,26 +172,12 @@ def search():
                 'yearTerm': row[4],
                 'universityID': row[5],
                 }
-                data_list.append(data_dict)
-            # Append the dictionary to the list
-            # data_list.append(data_dict)
-            # for x in data_list:
+                # Append the dictionary to the list
+                data_list.append(data_dict)        
             print(data_list)
             cursor.close()
             return jsonify(data_list)
-            # tuple = result[0]
-            # firstName, lastName, courseCode, courseName, yearTerm, universityID = tuple[0], tuple[1], tuple[2], tuple[3], tuple[4],tuple[5]
-
-            # cursor.close()
-            # # Return the data as JSON
-            # return jsonify({
-            #     'firstName': firstName,
-            #     'lastName': lastName,
-            #     'courseCode': courseCode,
-            #     'courseName': courseName,
-            #     'yearTerm': yearTerm,
-            #     'universityID': universityID,
-            # })
+            
         except Exception as e:
             raise BadRequest('An error occurred while search ' + str(e))
 
