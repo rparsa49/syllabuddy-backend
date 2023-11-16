@@ -139,11 +139,11 @@ def logout_user():
         return jsonify({'message': 'No user is currently logged in'})
     
 # Endpoint for search course 
-@app.route('/searchCourse', methods=['GET'])
+@app.route('/searchCourse', methods=['POST'])
 def search():
     try:
         data = request.get_json()
-
+        print("Received data:", data)
         if not data:
             raise BadRequest('Invalid request data')
         cursor = db_connection.cursor()
@@ -155,23 +155,48 @@ def search():
             FROM Users u 
             LEFT JOIN Professor p ON u.userID = p.userID 
             LEFT JOIN course c ON p.professorID = c.professorID 
-            LEFT JOIN course c ON c.universityID = u.universityID 
-            WHERE c.courseName = %s and u.university = %s ;
+            WHERE c.courseName = %s;
             """
-            cursor.execute(check_query, (data.get('courseName', '')), (data.get('universityID', '')))
-            result = cursor.fetchone()
+            cursor.execute(check_query,(data.get('courseName'),))
+            result = cursor.fetchall()
 
-            if result:
-                 firstName, lastName, courseCode, courseName, yearTerm, universityID = result
-
+            print(result)
+            data_list = []
+            for row in result:
+                # Extracting values from each tuple and creating a dictionary
+                data_dict = {
+                'firstName': row[0],
+                'lastName': row[1],
+                'courseCode': row[2],
+                'courseName': row[3],
+                'yearTerm': row[4],
+                'universityID': row[5],
+                }
+                data_list.append(data_dict)
+            # Append the dictionary to the list
+            # data_list.append(data_dict)
+            # for x in data_list:
+            print(data_list)
             cursor.close()
+            return jsonify(data_list)
+            # tuple = result[0]
+            # firstName, lastName, courseCode, courseName, yearTerm, universityID = tuple[0], tuple[1], tuple[2], tuple[3], tuple[4],tuple[5]
+
+            # cursor.close()
+            # # Return the data as JSON
+            # return jsonify({
+            #     'firstName': firstName,
+            #     'lastName': lastName,
+            #     'courseCode': courseCode,
+            #     'courseName': courseName,
+            #     'yearTerm': yearTerm,
+            #     'universityID': universityID,
+            # })
         except Exception as e:
             raise BadRequest('An error occurred while search ' + str(e))
 
     except BadRequest:
         raise BadRequest('Invalid request data')
-    return jsonify({'Courses:': result});
-
-
+    
 if __name__ == '__main__':
     app.run()
