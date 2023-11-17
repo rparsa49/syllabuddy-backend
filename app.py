@@ -144,23 +144,21 @@ def logout_user():
  # Endpoint for viewing favourite courses change user_id
 @app.route('/Viewfavouritecourses', methods=['POST'])
 def View_Fav():
- cursor = db_connection.cursor()
+ data = request.get_json()
+ 
  try:  
-     data = request.get_json()
-     
-    
-     
+     cursor = db_connection.cursor()
      view_query = """
      SELECT courseID FROM courseFavorite 
      WHERE userID = %s
      """
-     cursor.execute(view_query,(data.get('userID')))
+     cursor.execute(view_query,(data,))
      result = cursor.fetchall()
      print(result)
-        
+     
         
      cursor.close()
-     return jsonify({'message' : result})
+     return jsonify({'courseID' : result})
  except BadRequest:
         raise BadRequest('Invalid request data')
       
