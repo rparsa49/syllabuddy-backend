@@ -104,16 +104,25 @@ def register_user():
             # Hash the password before storing it
             hashed_password = generate_password_hash(data.get('password', ''))
 
+            # Get UniversityID
+            check_query = """
+            SELECT universityID FROM Universities WHERE universityName = %s
+            """
+            cursor.execute(check_query, (data.get('University', ''),))
+            result = cursor.fetchall()
+            if result:
+                universityID = result[0][0]
+            
             # If no existing user is found, proceed with registration
             registration_date = datetime.datetime.now()
             insert_query = """
-            INSERT INTO Users (username, password, userType, lastName, firstName, email, phoneNumber, registrationDate)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO Users (username, password, userType, lastName, firstName, email, phoneNumber, registrationDate, universityID)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(insert_query, (
                 data.get('userName', ''), hashed_password, data.get('userType', ''),
                 data.get('lastName', ''), data.get('firstName', ''), data.get('email', ''),
-                data.get('phoneNumber', ''), registration_date
+                data.get('phoneNumber', ''), registration_date, universityID
             ))
             db_connection.commit()
             cursor.close()
