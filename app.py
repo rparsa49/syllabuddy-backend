@@ -75,6 +75,7 @@ def login():
         raise BadRequest('Invalid request data')
 
 
+ 
 # Endpoint for user registration
 @app.route('/register', methods=['POST'])
 def register_user():
@@ -148,5 +149,27 @@ def logout_user():
         return jsonify({'message': 'No user is currently logged in'})
 
 
+
+ # Endpoint for viewing favourite courses change user_id
+@app.route('/Viewfavouritecourses', methods=['POST'])
+def View_Fav():
+ data = request.get_json()
+ 
+ try:  
+     cursor = db_connection.cursor()
+     view_query = """
+     SELECT courseID FROM courseFavorite 
+     WHERE userID = %s
+     """
+     cursor.execute(view_query,(data,))
+     result = cursor.fetchall()
+     print(result)
+     
+        
+     cursor.close()
+     return jsonify({'courseID' : result})
+ except BadRequest:
+        raise BadRequest('Invalid request data')
+      
 if __name__ == '__main__':
     app.run()
