@@ -26,13 +26,15 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 class User(UserMixin):
-    def __init__(self, user_id):
+    def __init__(self, user_id, user_name):
         self.id = user_id
+        self.name = user_name
 
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id, user_name):
     user = User(user_id)
-    return user
+    name = User(user_name)
+    return user, name
 
 
 # Endpoint for user login
@@ -60,10 +62,17 @@ def login():
 
                 # Check if the provided password matches the hashed password in the database
                 if check_password_hash(hashed_password, data.get('password', '')):
+                    name_query = """
+                    SELECT firstName FROM Users
+                    WHERE email = %s
+                    """
+                    cursor.execute(name_query, (data.get('email', ''),))
+                    name = cursor.fetchone()
+                    name = name[0]
                     # Log in the user after successful login
-                    user = User(user_id)
+                    user = User(user_id, name)
                     login_user(user)
-                    return jsonify({'user_id': user_id, 'message': 'User successfully logged in'})
+                    return jsonify({'user_id': user_id, 'user_name': name, 'message': 'User successfully logged in'})
 
             cursor.close()
             raise Unauthorized('Incorrect email or password')
@@ -243,25 +252,55 @@ def search():
 #         raise BadRequest('Invalid request data')
     
  # Endpoint for viewing favourite courses change user_id
-@app.route('/Viewfavouritecourses', methods=['POST'])
-def View_Fav():
- data = request.get_json()
- 
- try:  
-     cursor = db_connection.cursor()
-     view_query = """
-     SELECT courseID FROM courseFavorite 
-     WHERE userID = %s
-     """
-     cursor.execute(view_query,(data,))
-     result = cursor.fetchall()
-     print(result)
-     
-        
-     cursor.close()
-     return jsonify({'courseID' : result})
- except BadRequest:
-        raise BadRequest('Invalid request data')
+@app.route('/Viewfavouritecourses', methods=['GET', 'POST'])
+def view_favorite_courses():
+    if request.method == 'POST':
+        # Handle POST request for fetching favorite courses
+        data = request.get_json()
+
+        try:
+            cursor = db_connection.cursor()
+            view_query = """
+            SELECT courseID FROM courseFavorite 
+            WHERE userID = %s
+            """
+            cursor.execute(view_query, (data,))
+            result = cursor.fetchall()
+            print(result)
+
+            cursor.close()
+            return jsonify({'courseID': result})
+        except BadRequest:
+            raise BadRequest('Invalid request data')
+
+    elif request.method == 'GET':
+        # Handle GET request for initial rendering by fetching all favorite courses
+        # Get the user parameter from the URL
+        user = request.args.get('user')
+        if not user:
+            return jsonify({'error': 'User parameter is missing'})
+        try:
+            cursor = db_connection.cursor()
+            view_all_query = """
+            SELECT courseID FROM courseFavorite 
+            WHERE userID = %s
+            """
+            cursor.execute(view_all_query, (user,)) 
+            result_all = cursor.fetchall()
+            courses = [item[0] for item in result_all]
+            course_query = """
+            SELECT * from course
+            WHERE courseID = %s
+            """
+            res = []
+            for x in courses:
+                cursor.execute(course_query, (x,))
+                result = cursor.fetchone()
+                res.append(result)
+            cursor.close()
+            return jsonify({'favoriteCourses': res})
+        except Exception as e:
+            raise BadRequest('Invalid request data')
       
 
 if __name__ == '__main__':
