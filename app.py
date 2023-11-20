@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify 
 import mysql.connector
 import datetime
 from flask_cors import CORS
@@ -137,8 +137,8 @@ def register_user():
             raise BadRequest('An error occurred while registering the user: ' + str(e))
     except BadRequest:
         raise BadRequest('Invalid request data')
-
-# Endpoint to logout user and end their session
+    
+ # Endpoint for log out
 @app.route('/logout', methods=['POST'])
 def logout_user():
     if current_user.is_authenticated:
@@ -147,9 +147,101 @@ def logout_user():
         return jsonify({'message': 'User successfully logged out'})
     else:
         return jsonify({'message': 'No user is currently logged in'})
+    
+# Endpoint for search course 
+@app.route('/searchCourse', methods=['POST'])
+def search():
+    try:
+        data = request.get_json()
+        print("Received data:", data)
+        if not data:
+            raise BadRequest('Invalid request data')
+        cursor = db_connection.cursor()
 
+        try:
+            # Check if the courseName match
+            check_query = """
+            SELECT   u.firstName,   u.lastName,   c.courseCode,   c.courseName,   c.yearTerm, u.universityID
+            FROM Users u 
+            LEFT JOIN Professor p ON u.userID = p.userID 
+            LEFT JOIN course c ON p.professorID = c.professorID 
+            WHERE c.courseName = %s;
+            """
+            cursor.execute(check_query,(data.get('courseName'),))
+            result = cursor.fetchall()
 
+            print(result)
+            data_list = []
+            for row in result:
+                # Extracting values from each tuple and creating a dictionary
+                data_dict = {
+                'firstName': row[0],
+                'lastName': row[1],
+                'courseCode': row[2],
+                'courseName': row[3],
+                'yearTerm': row[4],
+                'universityID': row[5],
+                }
+                # Append the dictionary to the list
+                data_list.append(data_dict)        
+            print(data_list)
+            cursor.close()
+            return jsonify(data_list)
+            
+        except Exception as e:
+            raise BadRequest('An error occurred while search ' + str(e))
 
+    except BadRequest:
+        raise BadRequest('Invalid request data')
+    
+    # Endpoint for search course 
+# @app.route('/searchProfessor', methods=['POST'])
+# def search():
+#     try:
+#         data = request.get_json()
+#         print("Received data:", data)
+#         if not data:
+#             raise BadRequest('Invalid request data')
+#         cursor = db_connection.cursor()
+
+#         try:
+#             # Check if the courseName match
+#             check_query = """
+#             SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, u.universityID, p.department, p.title
+#             FROM Users u 
+#             LEFT JOIN Professor p ON u.userID = p.userID 
+#             WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;  
+#             """
+#             cursor.execute(check_query,(data.get('firstName'),data.get('lastName')))
+#             result = cursor.fetchall()
+
+#             print(result)
+#             data_list = []
+#             for row in result:
+#                 # Extracting values from each tuple and creating a dictionary
+#                 data_dict = {
+#                 'userID': row[0],
+#                 'firstName': row[1],
+#                 'lastName': row[2],
+#                 'userType': row[3],
+#                 'phoneNumber': row[4],
+#                 'email': row[5],
+#                 'universityID': row[6],
+#                 'department': row[7],
+#                 'title': row[8],
+#                 }
+#                 # Append the dictionary to the list
+#                 data_list.append(data_dict)        
+#             print(data_list)
+#             cursor.close()
+#             return jsonify(data_list)
+            
+#         except Exception as e:
+#             raise BadRequest('An error occurred while search ' + str(e))
+
+#     except BadRequest:
+#         raise BadRequest('Invalid request data')
+    
  # Endpoint for viewing favourite courses change user_id
 @app.route('/Viewfavouritecourses', methods=['POST'])
 def View_Fav():
@@ -171,5 +263,6 @@ def View_Fav():
  except BadRequest:
         raise BadRequest('Invalid request data')
       
+
 if __name__ == '__main__':
     app.run()
