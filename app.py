@@ -170,30 +170,41 @@ def search():
         try:
             # Check if the courseName match
             check_query = """
-            SELECT   u.firstName,   u.lastName,   c.courseCode,   c.courseName,   c.yearTerm, u.universityID
-            FROM Users u 
-            LEFT JOIN Professor p ON u.userID = p.userID 
-            LEFT JOIN course c ON p.professorID = c.professorID 
-            WHERE c.courseName = %s;
+                SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.yearTerm, u.universityID
+                FROM Users u 
+                LEFT JOIN Professor p ON u.userID = p.userID 
+                LEFT JOIN course c ON p.professorID = c.professorID 
+                WHERE c.courseName = %s;
             """
             cursor.execute(check_query,(data.get('courseName'),))
             result = cursor.fetchall()
 
-            print(result)
+            course_id_query = """
+                SELECT courseID
+                FROM course
+                WHERE courseName = %s;
+            """
+            cursor.execute(course_id_query, (data.get('courseName'),))
+            ids = [row[0] for row in cursor.fetchall()]
+            print(ids)
+            
+            # print(result)
             data_list = []
-            for row in result:
+            for index, row in enumerate(result):
                 # Extracting values from each tuple and creating a dictionary
                 data_dict = {
-                'firstName': row[0],
-                'lastName': row[1],
-                'courseCode': row[2],
-                'courseName': row[3],
-                'yearTerm': row[4],
-                'universityID': row[5],
+                    'firstName': row[0],
+                    'lastName': row[1],
+                    'courseCode': row[2],
+                    'courseName': row[3],
+                    'yearTerm': row[4],
+                    'universityID': row[5],
+                    'courseID': ids[index]  # Add the corresponding courseID
                 }
                 # Append the dictionary to the list
-                data_list.append(data_dict)        
-            print(data_list)
+                data_list.append(data_dict)
+                
+            # print(data_list)
             cursor.close()
             return jsonify(data_list)
             
@@ -293,15 +304,83 @@ def view_favorite_courses():
             WHERE courseID = %s
             """
             res = []
+            data_list = []
             for x in courses:
                 cursor.execute(course_query, (x,))
                 result = cursor.fetchone()
                 res.append(result)
+            
+            for row in res:
+                # Extracting values from each tuple and creating a dictionary
+                data_dict = {
+                'firstName': row[0],
+                'lastName': row[1],
+                'courseCode': row[2],
+                'courseName': row[3],
+                'yearTerm': row[4],
+                'universityID': row[5],
+                }
+                # Append the dictionary to the list
+                data_list.append(data_dict)
+                
+            print(data_list)
             cursor.close()
-            return jsonify({'favoriteCourses': res})
+            return jsonify(data_list)
         except Exception as e:
             raise BadRequest('Invalid request data')
-      
 
+# Endpoint for adding/removing favorite courses
+@app.route('/handlefavorite', methods=['POST'])
+def handlefavorite():
+    data = request.get_json()
+    user_id = data.get('userID')
+    course_id = data.get('courseID')
+
+    try:
+        cursor = db_connection.cursor()
+
+        # Check if the combination of courseID and userID exists in the courseFavorites table
+        check_query = """
+        SELECT courseFavoriteID FROM courseFavorite
+        WHERE courseID = %s AND userID = %s
+        """
+        cursor.execute(check_query, (course_id, user_id))
+        existing_favorite = cursor.fetchone()
+
+        if existing_favorite:
+            # If it exists, remove it
+            delete_query = """
+            DELETE FROM courseFavorite
+            WHERE courseFavoriteID = %s
+            """
+            cursor.execute(delete_query, (existing_favorite[0],))
+            db_connection.commit()
+            result = {'message': 'Favorite course removed'}
+        else:
+            # If it does not exist, add it with the courseID
+            insert_query = """
+            INSERT INTO courseFavorite (courseID, userID)
+            VALUES (%s, %s)
+            """
+            cursor.execute(insert_query, (course_id, user_id))
+            db_connection.commit()
+
+            # Retrieve the generated courseFavoriteID after insertion
+            select_last_insert_id_query = """
+            SELECT LAST_INSERT_ID()
+            """
+            cursor.execute(select_last_insert_id_query)
+            course_favorite_id = cursor.fetchone()[0]
+
+            result = {'message': 'Favorite course added',
+                      'courseFavoriteID': course_favorite_id}
+
+        cursor.close()
+        return jsonify(result)
+
+    except Exception as e:
+        raise BadRequest(
+            'An error occurred while handling favorites: ' + str(e))
+    
 if __name__ == '__main__':
     app.run()
