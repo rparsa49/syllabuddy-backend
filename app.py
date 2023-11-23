@@ -26,15 +26,17 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 class User(UserMixin):
-    def __init__(self, user_id, user_name):
+    def __init__(self, user_id, user_name, role):
         self.id = user_id
         self.name = user_name
-
+        self.role = role
+        
 @login_manager.user_loader
 def load_user(user_id, user_name):
     user = User(user_id)
     name = User(user_name)
-    return user, name
+    role = User(role)
+    return user, name, role
 
 def get_db():
     if 'db' not in g:
@@ -71,14 +73,14 @@ def login():
             try:
                 # Check if a user with the provided email exists
                 check_query = """
-                SELECT userId, password FROM Users
+                SELECT userId, password, userType FROM Users
                 WHERE email = %s
                 """
                 cursor.execute(check_query, (data.get('email', ''),))
                 result = cursor.fetchone()
 
                 if result:
-                    user_id, hashed_password = result
+                    user_id, hashed_password, user_type = result
 
                     # Check if the provided password matches the hashed password in the database
                     if check_password_hash(hashed_password, data.get('password', '')):
@@ -89,10 +91,10 @@ def login():
                         cursor.execute(name_query, (data.get('email', ''),))
                         name = cursor.fetchone()
                         name = name[0]
-                        # Log in the user after successful login
-                        user = User(user_id, name)
+                        # Log in the user after a successful login
+                        user = User(user_id, name, user_type)
                         login_user(user)
-                        return jsonify({'user_id': user_id, 'user_name': name, 'message': 'User successfully logged in'})
+                        return jsonify({'user_id': user_id, 'user_name': name, 'user_type': user_type, 'message': 'User successfully logged in'})
 
                 raise Unauthorized('Incorrect email or password')
 
@@ -102,6 +104,7 @@ def login():
 
     except BadRequest:
         raise BadRequest('Invalid request data')
+
  
 # Endpoint for user registration
 @app.route('/register', methods=['POST'])
@@ -159,7 +162,8 @@ def register_user():
                 get_db().commit()
 
                 # Log in the user after successful registration
-                user = User(cursor.lastrowid)
+                user_id = cursor.lastrowid
+                user = User(user_id, data.get('userName', ''), data.get('userType', ''))
                 login_user(user)
 
                 return jsonify({'message': 'User registered successfully'})
