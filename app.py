@@ -78,13 +78,12 @@ def login():
     except BadRequest:
         raise BadRequest('Invalid request data')
 
-
 # Endpoint for user registration
 @app.route('/register', methods=['POST'])
 def register_user():
     try:
         data = request.get_json()
-        print(request.method)
+
         # Check if the request data is received correctly
         if not data:
             raise BadRequest('Invalid request data')
@@ -124,10 +123,27 @@ def register_user():
                 data.get('phoneNumber', ''), registration_date
             ))
             db_connection.commit()
+
+            # Retrieve the userID of the inserted user
+            user_id = cursor.lastrowid
+
+            # Check if the user has the role 'professor'
+            if data.get('userType', '') == 'professor':
+                # Add the user to the Professor table
+                professor_insert_query = """
+                INSERT INTO Professor (userID, firstname, lastname)
+                VALUES (%s, %s, %s)
+                """
+                cursor.execute(professor_insert_query, (
+                    user_id, data.get(
+                        'firstName', ''), data.get('lastName', '')
+                ))
+                db_connection.commit()
+
             cursor.close()
 
             # Log in the user after successful registration
-            user = User(cursor.lastrowid)
+            user = User(user_id)
             login_user(user)
 
             return jsonify({'message': 'User registered successfully'})
