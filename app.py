@@ -218,6 +218,7 @@ def search():
         with get_db().cursor() as cursor:
             try:
                 # Check if the courseName match
+                # TODO: make sure only courses from the user's university are being displayed
                 check_query = """
                     SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.yearTerm, u.universityID
                     FROM Users u 
@@ -560,6 +561,62 @@ def add_course():
 
     except BadRequest:
         # Handle invalid request data and return a 400 status code
+        return jsonify({'error': 'Invalid request data'}), 400
+
+# Endpoint for viewing courses taught by a professor
+@app.route('/viewcourses', methods=['GET'])
+def view_courses():
+    try:
+        # Get the user parameter from the URL
+        user = request.args.get('user')
+
+        if not user:
+            return jsonify({'error': 'User parameter is missing'}), 400
+
+        with get_db().cursor() as cursor:
+            try:
+                # Find the professorID associated with the given userID
+                professor_query = """
+                SELECT professorID FROM Professor
+                WHERE userID = %s
+                """
+                cursor.execute(professor_query, (user,))
+                professor_result = cursor.fetchone()
+
+                if not professor_result:
+                    return jsonify({'error': 'No professor found for the given user'}), 404
+
+                professor_id = professor_result[0]
+
+                # Fetch all courses taught by the professor based on professorID
+                courses_query = """
+                SELECT c.courseID, c.courseCode, c.courseName, c.term
+                FROM course c
+                WHERE c.professorID = %s
+                """
+                cursor.execute(courses_query, (professor_id,))
+                courses_result = cursor.fetchall()
+
+                if not courses_result:
+                    return jsonify({'courses': []})
+
+                # Create a list of courses with necessary information
+                courses = [
+                    {
+                        'courseID': row[0],
+                        'courseCode': row[1],
+                        'courseName': row[2],
+                        'term': row[3],
+                    }
+                    for row in courses_result
+                ]
+
+                return jsonify({'courses': courses})
+
+            except Exception as e:
+                return jsonify({'error': 'An error occurred while fetching courses: ' + str(e)}), 500
+
+    except BadRequest:
         return jsonify({'error': 'Invalid request data'}), 400
 
 if __name__ == '__main__':
