@@ -618,6 +618,107 @@ def view_courses():
 
     except BadRequest:
         return jsonify({'error': 'Invalid request data'}), 400
+# Endpoint for user to edit course
+@app.route('/editcourse', methods=['POST'])
+def edit_course():
+    try:
+        data = request.form
+        # Check if the request data is received correctly
+        if not data:
+            raise BadRequest('Invalid request data')
 
+        with get_db().cursor() as cursor:
+            try:
+                # Get Syllabus contents
+                syllabus = request.files['syllabus']
+                contents = syllabus.read()
+
+                # Get tags data
+                tags_data = data.get('tags', '')
+                tags = json.loads(tags_data) if tags_data else []
+                tags_json = json.dumps(tags)
+
+                # Get UniversityID
+                check_query = """
+                SELECT universityID FROM Universities WHERE universityName = %s
+                """
+                cursor.execute(
+                    check_query, (data.get('selectedUniversity', ''),))
+                result = cursor.fetchall()
+                if result:
+                    universityID = result[0][0]
+
+                # Get ProfessorID
+                check_query = """
+                SELECT professorID FROM Professor WHERE firstname = %s AND lastname = %s
+                """
+                cursor.execute(check_query, (data.get(
+                    'profFirstname', ''), data.get('profLastname', '')))
+                result = cursor.fetchall()
+                if result:
+                    professorID = result[0][0]
+                else:
+                    # Insert new professor if not found
+                    insert_query = """
+                    INSERT INTO Professor (professorID, universityID, firstname, lastname)
+                    VALUES (%s, %s, %s, %s)
+                    """
+                    cursor.execute(insert_query, (None, universityID, data.get(
+                        'profFirstname', ''), data.get('profLastname', '')))
+                    get_db().commit()
+
+                    # Retrieve the newly inserted professorID
+                    check_query = """
+                    SELECT professorID FROM Professor WHERE firstname = %s AND lastname = %s
+                    """
+                    cursor.execute(check_query, (data.get(
+                        'profFirstname', ''), data.get('profLastname', '')))
+                    result = cursor.fetchall()
+                    professorID = result[0][0]
+
+                # Check if course code AT THAT UNIVERSITY already exists
+                check_query = """
+                SELECT COUNT(*)
+                FROM course
+                WHERE courseCode = %s AND universityID = %s
+                """
+                cursor.execute(check_query, (data.get(
+                    'courseCode', ''), universityID))
+                result = cursor.fetchone()
+
+                
+
+                # Insert the new course information 
+                update_query = """
+                UPDATE course (courseCode, courseName, professorID, universityID, courseDescription, averageGrade, tags, term, syllabus)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(insert_query, (
+                    data.get('courseCode', ''),
+                    data.get('courseName', ''),
+                    professorID,
+                    universityID,
+                    data.get('courseDesc', ''),
+                    data.get('averageGrade', ''),
+                    tags_json,
+                    data.get('term', ''),
+                    contents
+                ))
+
+                get_db().commit()
+
+                return jsonify({'message': 'Course changed successfully'}), 200
+
+            except Conflict as conflict_error:
+                # Catch the specific Conflict exception and return a 409 status code
+                return jsonify({'error': str(conflict_error)}), 409
+
+            except Exception as e:
+                # Handle other exceptions and return a 500 status code
+                return jsonify({'error': str(e)}), 500
+
+    except BadRequest:
+        # Handle invalid request data and return a 400 status code
+        return jsonify({'error': 'Invalid request data'}), 400
 if __name__ == '__main__':
     app.run()
