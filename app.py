@@ -629,6 +629,9 @@ def edit_course():
 
         with get_db().cursor() as cursor:
             try:
+                # Get Course ID
+                courseID = request.args.get('courseID')
+                
                 # Get Syllabus contents
                 syllabus = request.files['syllabus']
                 contents = syllabus.read()
@@ -676,20 +679,11 @@ def edit_course():
                     result = cursor.fetchall()
                     professorID = result[0][0]
 
-                # Check if course code AT THAT UNIVERSITY already exists
-                check_query = """
-                SELECT COUNT(*)
-                FROM course
-                WHERE courseCode = %s AND universityID = %s
-                """
-                cursor.execute(check_query, (data.get(
-                    'courseCode', ''), universityID))
-                result = cursor.fetchone()
-
                 # Insert the new course information 
                 update_query = """
-                UPDATE course (courseCode, courseName, professorID, universityID, courseDescription, averageGrade, tags, term, syllabus)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                UPDATE course
+                SET courseCode = %s, courseName = %s, professorID = %s, universityID = %s, courseDescription = %s, averageGrade = %s, tags = %s, term = %s, syllabus = %s
+                WHERE courseID = %s;
                 """
                 cursor.execute(update_query, (
                     data.get('courseCode', ''),
@@ -700,7 +694,8 @@ def edit_course():
                     data.get('averageGrade', ''),
                     tags_json,
                     data.get('term', ''),
-                    contents
+                    contents,
+                    courseID
                 ))
 
                 get_db().commit()
