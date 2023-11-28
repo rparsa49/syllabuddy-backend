@@ -686,14 +686,12 @@ def edit_course():
                     'courseCode', ''), universityID))
                 result = cursor.fetchone()
 
-                
-
                 # Insert the new course information 
                 update_query = """
                 UPDATE course (courseCode, courseName, professorID, universityID, courseDescription, averageGrade, tags, term, syllabus)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
-                cursor.execute(insert_query, (
+                cursor.execute(update_query, (
                     data.get('courseCode', ''),
                     data.get('courseName', ''),
                     professorID,
