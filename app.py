@@ -220,7 +220,7 @@ def search():
                 # Check if the courseName match
                 # TODO: make sure only courses from the user's university are being displayed
                 check_query = """
-                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.yearTerm, u.universityID
+                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
                     FROM Users u 
                     LEFT JOIN Professor p ON u.userID = p.userID 
                     LEFT JOIN course c ON p.professorID = c.professorID 
@@ -354,7 +354,7 @@ def view_favorite_courses():
                 ids = [item[0] for item in result_all]
 
                 course_query = """
-                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.yearTerm, u.universityID
+                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
                     FROM Users u 
                     LEFT JOIN Professor p ON u.userID = p.userID 
                     LEFT JOIN course c ON p.professorID = c.professorID 
@@ -372,7 +372,7 @@ def view_favorite_courses():
                     else:
                         # Handle the case when there is no data for the given course name
                         res.append(('Unknown', 'Unknown', 'Unknown',
-                                   x, 'Unknown', 'Unknown'))
+                                   'Unknown', 'Unknown', 'Unknown'))
 
                     # Iterate over the outer list of lists
                 for outer_list in res:
