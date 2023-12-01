@@ -6,7 +6,9 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, curren
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import BadRequest, Unauthorized, Conflict
 import json
-
+from email.message import EmailMessage
+import ssl
+import smtplib
 app = Flask(__name__)
 
 # Configure MySQL database connection
@@ -119,7 +121,10 @@ def login():
 @app.route('/register', methods=['POST'])
 def register_user():
     try:
+        
+
         data = request.get_json()
+        email = data.get('email','')
         print(request.method)
 
         # Check if the request data is received correctly
@@ -177,6 +182,32 @@ def register_user():
 
                 # Check if the user is a professor
                 if data.get('userType', '') == 'professor':
+                    email_sender = 'syllabuddy.wearebadatnames@gmail.com'
+                    email_password = 'wqzsuxudjymfkatm'
+                    email_reciever = data.get('email','')
+
+                    subject = 'Thank you for signing up for Syllabuddy!'
+                    body = """
+                    Hello! Thank you for signing up for Syllabuddy we hope you enjoy your experience!
+
+                    Username : {username}
+
+                    password : {password}
+
+                    """.format(username = data.get('userName',''),password = data.get('password',''))
+                    em = EmailMessage()
+                    em['From'] = email_sender
+                    em['To']   = email_reciever
+                    em['Subject'] = subject
+                    em.set_content(body)
+
+                    
+
+                    server = smtplib.SMTP('smtp.gmail.com' ,587 ) 
+                    server.starttls()
+                    server.login(email_sender,email_password)
+                    server.sendmail(email_sender, email_reciever,em.as_string())
+                    server.quit()
                     # Insert professor information into the Professor table
                     insert_professor_query = """
                     INSERT INTO Professor (professorID, universityID, firstname, lastname, userID)
