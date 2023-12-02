@@ -5,7 +5,10 @@ from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import BadRequest, Unauthorized, Conflict
-
+import json
+from email.message import EmailMessage
+import ssl
+import smtplib
 app = Flask(__name__)
 
 # Configure MySQL database connection
@@ -25,28 +28,29 @@ app.secret_key = "lF!}'dcq4*,BaTH"
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+
 class User(UserMixin):
-    def __init__(self, user_id, user_name, role):
+    def __init__(self, user_id, user_name, user_role):
         self.id = user_id
         self.name = user_name
-        self.role = role
-        
+        self.role = user_role
+
 @login_manager.user_loader
-def load_user(user_id, user_name):
+def load_user(user_id, user_name, user_role):
     user = User(user_id)
     name = User(user_name)
-    role = User(role)
+    role = User(user_role)
     return user, name, role
 
 def get_db():
     if 'db' not in g:
         # g.db = mysql.connector.connect(**db_config)
         g.db = mysql.connector.connect(
-            host = 'database-1.cqmz08yhaga0.us-east-2.rds.amazonaws.com',
-            port = '3306',
-            user = 'admin_syllabuddy',
-            password = 'zozRun-sopgu0-gysrip',
-            db = 'syllabuddy'
+            host='database-1.cqmz08yhaga0.us-east-2.rds.amazonaws.com',
+            port='3306',
+            user='admin_syllabuddy',
+            password='zozRun-sopgu0-gysrip',
+            db='syllabuddy'
         )
     return g.db
 
@@ -73,14 +77,14 @@ def login():
             try:
                 # Check if a user with the provided email exists
                 check_query = """
-                SELECT userId, password, userType FROM Users
+                SELECT userId, password FROM Users
                 WHERE email = %s
                 """
                 cursor.execute(check_query, (data.get('email', ''),))
                 result = cursor.fetchone()
 
                 if result:
-                    user_id, hashed_password, user_type = result
+                    user_id, hashed_password = result
 
                     # Check if the provided password matches the hashed password in the database
                     if check_password_hash(hashed_password, data.get('password', '')):
@@ -91,10 +95,18 @@ def login():
                         cursor.execute(name_query, (data.get('email', ''),))
                         name = cursor.fetchone()
                         name = name[0]
-                        # Log in the user after a successful login
-                        user = User(user_id, name, user_type)
+                        
+                        role_query = """
+                        SELECT userType FROM Users
+                        WHERE email = %s
+                        """ 
+                        cursor.execute(role_query, (data.get('email', ''),))
+                        role = cursor.fetchone()
+                        role = role[0]
+                        # Log in the user after successful login
+                        user = User(user_id, name, role)
                         login_user(user)
-                        return jsonify({'user_id': user_id, 'user_name': name, 'user_type': user_type, 'message': 'User successfully logged in'})
+                        return jsonify({'user_id': user_id, 'user_name': name, 'role': role, 'message': 'User successfully logged in'})
 
                 raise Unauthorized('Incorrect email or password')
 
@@ -105,12 +117,14 @@ def login():
     except BadRequest:
         raise BadRequest('Invalid request data')
 
- 
 # Endpoint for user registration
 @app.route('/register', methods=['POST'])
 def register_user():
     try:
+        
+
         data = request.get_json()
+        email = data.get('email','')
         print(request.method)
 
         # Check if the request data is received correctly
@@ -163,8 +177,45 @@ def register_user():
 
                 # Log in the user after successful registration
                 user_id = cursor.lastrowid
-                user = User(user_id, data.get('userName', ''), data.get('userType', ''))
+                user = User(user_id, data.get('firstName', ''), data.get('userType', ''))
                 login_user(user)
+
+                # Check if the user is a professor
+                if data.get('userType', '') == 'professor':
+                    email_sender = 'syllabuddy.wearebadatnames@gmail.com'
+                    email_password = 'wqzsuxudjymfkatm'
+                    email_reciever = data.get('email','')
+
+                    subject = 'Thank you for signing up for Syllabuddy!'
+                    body = """
+                    Hello! Thank you for signing up for Syllabuddy we hope you enjoy your experience!
+
+                    Username : {username}
+
+                    password : {password}
+
+                    """.format(username = data.get('userName',''),password = data.get('password',''))
+                    em = EmailMessage()
+                    em['From'] = email_sender
+                    em['To']   = email_reciever
+                    em['Subject'] = subject
+                    em.set_content(body)
+
+                    
+
+                    server = smtplib.SMTP('smtp.gmail.com' ,587 ) 
+                    server.starttls()
+                    server.login(email_sender,email_password)
+                    server.sendmail(email_sender, email_reciever,em.as_string())
+                    server.quit()
+                    # Insert professor information into the Professor table
+                    insert_professor_query = """
+                    INSERT INTO Professor (professorID, universityID, firstname, lastname, userID)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """
+                    cursor.execute(insert_professor_query, (
+                        user_id, universityID, data.get('firstName', ''), data.get('lastName', ''), user_id))
+                    get_db().commit()
 
                 return jsonify({'message': 'User registered successfully'})
 
@@ -175,6 +226,7 @@ def register_user():
     except BadRequest:
         raise BadRequest('Invalid request data')
 
+
  # Endpoint for log out
 @app.route('/logout', methods=['POST'])
 def logout_user():
@@ -184,7 +236,7 @@ def logout_user():
         return jsonify({'message': 'User successfully logged out'})
     else:
         return jsonify({'message': 'No user is currently logged in'})
-    
+
 # Endpoint for search course
 @app.route('/searchCourse', methods=['POST'])
 def search():
@@ -197,8 +249,9 @@ def search():
         with get_db().cursor() as cursor:
             try:
                 # Check if the courseName match
+                # TODO: make sure only courses from the user's university are being displayed
                 check_query = """
-                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.yearTerm, u.universityID
+                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
                     FROM Users u 
                     LEFT JOIN Professor p ON u.userID = p.userID 
                     LEFT JOIN course c ON p.professorID = c.professorID 
@@ -240,6 +293,7 @@ def search():
     except BadRequest:
         raise BadRequest('Invalid request data')
 
+<<<<<<< HEAD
 # Endpoint for search course with Professor name
 @app.route('/searchProfessor', methods=['POST'])
 def search():
@@ -290,6 +344,9 @@ def search():
     
 # Endpoint for viewing favourite courses change user_id
 
+=======
+# Endpoint for viewing favourite courses 
+>>>>>>> upstream/main
 @app.route('/Viewfavouritecourses', methods=['GET', 'POST'])
 def view_favorite_courses():
     if request.method == 'POST':
@@ -311,8 +368,8 @@ def view_favorite_courses():
             raise BadRequest('Invalid request data')
 
     elif request.method == 'GET':
-    # Handle GET request for initial rendering by fetching all favorite courses
-    # Get the user parameter from the URL
+        # Handle GET request for initial rendering by fetching all favorite courses
+        # Get the user parameter from the URL
         user = request.args.get('user')
         if not user:
             return jsonify({'error': 'User parameter is missing'}), 400
@@ -331,9 +388,9 @@ def view_favorite_courses():
                     return jsonify({'error': 'No favorite courses found for the user'}), 404
 
                 ids = [item[0] for item in result_all]
-                                        
+
                 course_query = """
-                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.yearTerm, u.universityID
+                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
                     FROM Users u 
                     LEFT JOIN Professor p ON u.userID = p.userID 
                     LEFT JOIN course c ON p.professorID = c.professorID 
@@ -350,7 +407,8 @@ def view_favorite_courses():
                         res.append(result)
                     else:
                         # Handle the case when there is no data for the given course name
-                        res.append(('Unknown', 'Unknown', 'Unknown', x, 'Unknown', 'Unknown'))
+                        res.append(('Unknown', 'Unknown', 'Unknown',
+                                   'Unknown', 'Unknown', 'Unknown'))
 
                     # Iterate over the outer list of lists
                 for outer_list in res:
@@ -433,9 +491,269 @@ def handlefavorite():
     except Exception as e:
         raise BadRequest(
             'An error occurred while handling favorites: ' + str(e))
+        
+# Endpoint for user to add course
+@app.route('/addcourse', methods=['POST'])
+def add_course():
+    try:
+        data = request.form
+        # Check if the request data is received correctly
+        if not data:
+            raise BadRequest('Invalid request data')
 
+<<<<<<< HEAD
 # def down():
 
 
+=======
+        with get_db().cursor() as cursor:
+            try:
+                # Get Syllabus contents
+                syllabus = request.files['syllabus']
+                contents = syllabus.read()
+
+                # Get tags data
+                tags_data = data.get('tags', '')
+                tags = json.loads(tags_data) if tags_data else []
+                tags_json = json.dumps(tags)
+
+                # Get UniversityID
+                check_query = """
+                SELECT universityID FROM Universities WHERE universityName = %s
+                """
+                cursor.execute(
+                    check_query, (data.get('selectedUniversity', ''),))
+                result = cursor.fetchall()
+                if result:
+                    universityID = result[0][0]
+
+                # Get ProfessorID
+                check_query = """
+                SELECT professorID FROM Professor WHERE firstname = %s AND lastname = %s
+                """
+                cursor.execute(check_query, (data.get(
+                    'profFirstname', ''), data.get('profLastname', '')))
+                result = cursor.fetchall()
+                if result:
+                    professorID = result[0][0]
+                else:
+                    # Insert new professor if not found
+                    insert_query = """
+                    INSERT INTO Professor (professorID, universityID, firstname, lastname)
+                    VALUES (%s, %s, %s, %s)
+                    """
+                    cursor.execute(insert_query, (None, universityID, data.get(
+                        'profFirstname', ''), data.get('profLastname', '')))
+                    get_db().commit()
+
+                    # Retrieve the newly inserted professorID
+                    check_query = """
+                    SELECT professorID FROM Professor WHERE firstname = %s AND lastname = %s
+                    """
+                    cursor.execute(check_query, (data.get(
+                        'profFirstname', ''), data.get('profLastname', '')))
+                    result = cursor.fetchall()
+                    professorID = result[0][0]
+
+                # Check if course code AT THAT UNIVERSITY already exists
+                check_query = """
+                SELECT COUNT(*)
+                FROM course
+                WHERE courseCode = %s AND universityID = %s
+                """
+                cursor.execute(check_query, (data.get(
+                    'courseCode', ''), universityID))
+                result = cursor.fetchone()
+
+                # If no existing course is found, proceed with adding it.
+                if result and result[0] > 0:
+                    # course code already exists at this university
+                    raise Conflict(
+                        'A course already exists with this course code at this university. Please adjust your input.')
+
+                # Insert the new course
+                insert_query = """
+                INSERT INTO course (courseCode, courseName, professorID, universityID, courseDescription, averageGrade, tags, term, syllabus)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(insert_query, (
+                    data.get('courseCode', ''),
+                    data.get('courseName', ''),
+                    professorID,
+                    universityID,
+                    data.get('courseDesc', ''),
+                    data.get('averageGrade', ''),
+                    tags_json,
+                    data.get('term', ''),
+                    contents
+                ))
+
+                get_db().commit()
+
+                return jsonify({'message': 'Course added successfully'}), 200
+
+            except Conflict as conflict_error:
+                # Catch the specific Conflict exception and return a 409 status code
+                return jsonify({'error': str(conflict_error)}), 409
+
+            except Exception as e:
+                # Handle other exceptions and return a 500 status code
+                return jsonify({'error': str(e)}), 500
+
+    except BadRequest:
+        # Handle invalid request data and return a 400 status code
+        return jsonify({'error': 'Invalid request data'}), 400
+
+# Endpoint for viewing courses taught by a professor
+@app.route('/viewcourses', methods=['GET'])
+def view_courses():
+    try:
+        # Get the user parameter from the URL
+        user = request.args.get('user')
+
+        if not user:
+            return jsonify({'error': 'User parameter is missing'}), 400
+
+        with get_db().cursor() as cursor:
+            try:
+                # Find the professorID associated with the given userID
+                professor_query = """
+                SELECT professorID FROM Professor
+                WHERE userID = %s
+                """
+                cursor.execute(professor_query, (user,))
+                professor_result = cursor.fetchone()
+
+                if not professor_result:
+                    return jsonify({'error': 'No professor found for the given user'}), 404
+
+                professor_id = professor_result[0]
+
+                # Fetch all courses taught by the professor based on professorID
+                courses_query = """
+                SELECT c.courseID, c.courseCode, c.courseName, c.term
+                FROM course c
+                WHERE c.professorID = %s
+                """
+                cursor.execute(courses_query, (professor_id,))
+                courses_result = cursor.fetchall()
+
+                if not courses_result:
+                    return jsonify({'courses': []})
+
+                # Create a list of courses with necessary information
+                courses = [
+                    {
+                        'courseID': row[0],
+                        'courseCode': row[1],
+                        'courseName': row[2],
+                        'term': row[3],
+                    }
+                    for row in courses_result
+                ]
+
+                return jsonify({'courses': courses})
+
+            except Exception as e:
+                return jsonify({'error': 'An error occurred while fetching courses: ' + str(e)}), 500
+
+    except BadRequest:
+        return jsonify({'error': 'Invalid request data'}), 400
+# Endpoint for user to edit course
+@app.route('/editcourse', methods=['POST'])
+def edit_course():
+    try:
+        data = request.form
+        # Check if the request data is received correctly
+        if not data:
+            raise BadRequest('Invalid request data')
+
+        with get_db().cursor() as cursor:
+            try:
+                # Get Course ID
+                courseID = request.args.get('courseID')
+                
+                # Get Syllabus contents
+                syllabus = request.files['syllabus']
+                contents = syllabus.read()
+
+                # Get tags data
+                tags_data = data.get('tags', '')
+                tags = json.loads(tags_data) if tags_data else []
+                tags_json = json.dumps(tags)
+
+                # Get UniversityID
+                check_query = """
+                SELECT universityID FROM Universities WHERE universityName = %s
+                """
+                cursor.execute(
+                    check_query, (data.get('selectedUniversity', ''),))
+                result = cursor.fetchall()
+                if result:
+                    universityID = result[0][0]
+
+                # Get ProfessorID
+                check_query = """
+                SELECT professorID FROM Professor WHERE firstname = %s AND lastname = %s
+                """
+                cursor.execute(check_query, (data.get(
+                    'profFirstname', ''), data.get('profLastname', '')))
+                result = cursor.fetchall()
+                if result:
+                    professorID = result[0][0]
+                else:
+                    # Insert new professor if not found
+                    insert_query = """
+                    INSERT INTO Professor (professorID, universityID, firstname, lastname)
+                    VALUES (%s, %s, %s, %s)
+                    """
+                    cursor.execute(insert_query, (None, universityID, data.get(
+                        'profFirstname', ''), data.get('profLastname', '')))
+                    get_db().commit()
+
+                    # Retrieve the newly inserted professorID
+                    check_query = """
+                    SELECT professorID FROM Professor WHERE firstname = %s AND lastname = %s
+                    """
+                    cursor.execute(check_query, (data.get(
+                        'profFirstname', ''), data.get('profLastname', '')))
+                    result = cursor.fetchall()
+                    professorID = result[0][0]
+
+                # Insert the new course information 
+                update_query = """
+                UPDATE course
+                SET courseCode = %s, courseName = %s, professorID = %s, universityID = %s, courseDescription = %s, averageGrade = %s, tags = %s, term = %s, syllabus = %s
+                WHERE courseID = %s;
+                """
+                cursor.execute(update_query, (
+                    data.get('courseCode', ''),
+                    data.get('courseName', ''),
+                    professorID,
+                    universityID,
+                    data.get('courseDesc', ''),
+                    data.get('averageGrade', ''),
+                    tags_json,
+                    data.get('term', ''),
+                    contents,
+                    courseID
+                ))
+
+                get_db().commit()
+
+                return jsonify({'message': 'Course changed successfully'}), 200
+
+            except Conflict as conflict_error:
+                # Catch the specific Conflict exception and return a 409 status code
+                return jsonify({'error': str(conflict_error)}), 409
+
+            except Exception as e:
+                # Handle other exceptions and return a 500 status code
+                return jsonify({'error': str(e)}), 500
+
+    except BadRequest:
+        # Handle invalid request data and return a 400 status code
+        return jsonify({'error': 'Invalid request data'}), 400
+>>>>>>> upstream/main
 if __name__ == '__main__':
     app.run()
