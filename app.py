@@ -241,52 +241,52 @@ def search():
         raise BadRequest('Invalid request data')
 
 # Endpoint for search course with Professor name
-# @app.route('/searchProfessor', methods=['POST'])
-# def search():
-#     try:
-#         data = request.get_json()
-#         print("Received data:", data)
-#         if not data:
-#             raise BadRequest('Invalid request data')
-#         cursor = db_connection.cursor()
+@app.route('/searchProfessor', methods=['POST'])
+def search():
+    try:
+        data = request.get_json()
+        print("Received data:", data)
+        if not data:
+            raise BadRequest('Invalid request data')
+        cursor = db_connection.cursor()
 
-#         try:
-#             # Check if the courseName match
-#             check_query = """
-#             SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, u.universityID, p.department, p.title
-#             FROM Users u 
-#             LEFT JOIN Professor p ON u.userID = p.userID 
-#             WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;  
-#             """
-#             cursor.execute(check_query,(data.get('firstName'),data.get('lastName')))
-#             result = cursor.fetchall()
+        try:
+            # Check if the courseName match
+            check_query = """
+            SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, u.universityID, p.department, p.title
+            FROM Users u 
+            LEFT JOIN Professor p ON u.userID = p.userID 
+            WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;  
+            """
+            cursor.execute(check_query,(data.get('firstName'),data.get('lastName')))
+            result = cursor.fetchall()
 
-#             print(result)
-#             data_list = []
-#             for row in result:
-#                 # Extracting values from each tuple and creating a dictionary
-#                 data_dict = {
-#                 'userID': row[0],
-#                 'firstName': row[1],
-#                 'lastName': row[2],
-#                 'userType': row[3],
-#                 'phoneNumber': row[4],
-#                 'email': row[5],
-#                 'universityID': row[6],
-#                 'department': row[7],
-#                 'title': row[8],
-#                 }
-#                 # Append the dictionary to the list
-#                 data_list.append(data_dict)        
-#             print(data_list)
-#             cursor.close()
-#             return jsonify(data_list)
+            print(result)
+            data_list = []
+            for row in result:
+                # Extracting values from each tuple and creating a dictionary
+                data_dict = {
+                'userID': row[0],
+                'firstName': row[1],
+                'lastName': row[2],
+                'userType': row[3],
+                'phoneNumber': row[4],
+                'email': row[5],
+                'universityID': row[6],
+                'department': row[7],
+                'title': row[8],
+                }
+                # Append the dictionary to the list
+                data_list.append(data_dict)        
+            print(data_list)
+            cursor.close()
+            return jsonify(data_list)
             
-#         except Exception as e:
-#             raise BadRequest('An error occurred while search ' + str(e))
+        except Exception as e:
+            raise BadRequest('An error occurred while search ' + str(e))
 
-#     except BadRequest:
-#         raise BadRequest('Invalid request data')
+    except BadRequest:
+        raise BadRequest('Invalid request data')
     
 # Endpoint for viewing favourite courses change user_id
 
@@ -433,6 +433,9 @@ def handlefavorite():
     except Exception as e:
         raise BadRequest(
             'An error occurred while handling favorites: ' + str(e))
+
+# def down():
+
 
 if __name__ == '__main__':
     app.run()
