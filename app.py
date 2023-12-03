@@ -696,5 +696,73 @@ def edit_course():
     except BadRequest:
         # Handle invalid request data and return a 400 status code
         return jsonify({'error': 'Invalid request data'}), 400
+    
+# Endpoint for user to view course display
+@app.route('/coursedisplay', methods=['POST'])
+def course_display():
+    try:
+        data = request.get_json()
+        courseID = data.get('courseID')
+        courseID = courseID.get('courseID')
+        #print(courseID)
+        # Check if the request data is received correctly
+        if not data:
+            raise BadRequest('Invalid request data')
+        
+        with get_db().cursor() as cursor:
+            try:
+                course_query = """
+                SELECT c.courseCode, c.courseName, c.professorID, c.universityID, c.courseDescription, c.averageGrade, c.tags, c.term
+                FROM course c
+                WHERE courseID = %s
+                """
+                cursor.execute(course_query, (courseID,))
+                course_result = cursor.fetchall()
+
+                courseCode = course_result[0][0]
+                courseName = course_result[0][1]
+                averageGrade = course_result[0][5]
+                tags = course_result[0][6]
+                courseDesc = course_result[0][4]
+                terms = course_result[0][7]
+
+                university_query = """
+                SELECT universityName
+                FROM Universities
+                WHERE universityID = %s
+                """
+                cursor.execute(university_query, (course_result[0][3],))
+                university_result = cursor.fetchall()
+                university = university_result[0][0]
+
+                professor_query = """
+                SELECT firstname, lastname
+                FROM Professor
+                WHERE professorID = %s
+                """
+                cursor.execute(professor_query, (course_result[0][2],))
+                professor_result = cursor.fetchall()
+                profName = professor_result[0][0] + " " + professor_result[0][1]
+
+                return jsonify({
+                    'courseName': courseName,
+                    'courseCode': courseCode,
+                    'averageGrade': averageGrade,
+                    'tags' : tags,
+                    'courseDesc': courseDesc,
+                    'university': university,
+                    'profName': profName,
+                    'terms': terms
+                }), 200
+            except Conflict as conflict_error:
+                # Catch the specific Conflict exception and return a 409 status code
+                return jsonify({'error': str(conflict_error)}), 409
+
+            except Exception as e:
+                # Handle other exceptions and return a 500 status code
+                return jsonify({'error': str(e)}), 500
+    except BadRequest:
+        # Handle invalid request data and return a 400 status code
+        return jsonify({'error': 'Invalid request data'}), 400
 if __name__ == '__main__':
     app.run()
