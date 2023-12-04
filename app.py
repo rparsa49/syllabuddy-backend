@@ -226,7 +226,6 @@ def register_user():
     except BadRequest:
         raise BadRequest('Invalid request data')
 
-
  # Endpoint for log out
 @app.route('/logout', methods=['POST'])
 def logout_user():
@@ -239,7 +238,7 @@ def logout_user():
 
 # Endpoint for search course
 @app.route('/searchCourse', methods=['POST'])
-def search():
+def searchCourse():
     try:
         data = request.get_json()
         print("Received data:", data)
@@ -293,60 +292,56 @@ def search():
     except BadRequest:
         raise BadRequest('Invalid request data')
 
-<<<<<<< HEAD
-# Endpoint for search course with Professor name
-@app.route('/searchProfessor', methods=['POST'])
-def search():
-    try:
-        data = request.get_json()
-        print("Received data:", data)
-        if not data:
-            raise BadRequest('Invalid request data')
-        cursor = db_connection.cursor()
+# # Endpoint for search professor name
+#     @app.route('/searchProfessor', methods=['POST'])
+#     def searchProfessor():
+#         try:
+#             data = request.get_json()
+#             print("Received data:", data)
+#             if not data:
+#                 raise BadRequest('Invalid request data')
 
-        try:
-            # Check if the courseName match
-            check_query = """
-            SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, u.universityID, p.department, p.title
-            FROM Users u 
-            LEFT JOIN Professor p ON u.userID = p.userID 
-            WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;  
-            """
-            cursor.execute(check_query,(data.get('firstName'),data.get('lastName')))
-            result = cursor.fetchall()
+#             with get_db().cursor() as cursor:
+#                 try:
+#                     # Check if the courseName match
+#                     # TODO: make sure only courses from the user's university are being displayed
+#                     check_query = """
+#                         SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, u.universityID, p.department, p.title
+#                         FROM Users u
+#                         LEFT JOIN Professor p ON u.userID = p.userID
+#                         WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;          
+#                     """
+#                     cursor.execute(check_query,(data.get('firstName'),data.get('lastName')))                
+#                     result = cursor.fetchall()
+#                     print(result)
+                    
+#                     data_list = []
+#                     for index, row in enumerate(result):
+#                         # Extracting values from each tuple and creating a dictionary
+#                         data_dict = {
+#                             'userID': row[0],
+#                             'firstName': row[1],
+#                             'lastName': row[2],
+#                             'userType': row[3],
+#                             'phoneNumber': row[4],
+#                             'email': row[5],
+#                             'universityID': row[6],
+#                             'department': row[7],
+#                             'title': row[8],
+#                         }
+#                         # Append the dictionary to the list
+#                         data_list.append(data_dict)
 
-            print(result)
-            data_list = []
-            for row in result:
-                # Extracting values from each tuple and creating a dictionary
-                data_dict = {
-                'userID': row[0],
-                'firstName': row[1],
-                'lastName': row[2],
-                'userType': row[3],
-                'phoneNumber': row[4],
-                'email': row[5],
-                'universityID': row[6],
-                'department': row[7],
-                'title': row[8],
-                }
-                # Append the dictionary to the list
-                data_list.append(data_dict)        
-            print(data_list)
-            cursor.close()
-            return jsonify(data_list)
-            
-        except Exception as e:
-            raise BadRequest('An error occurred while search ' + str(e))
+#                     return jsonify(data_list)
 
-    except BadRequest:
-        raise BadRequest('Invalid request data')
-    
-# Endpoint for viewing favourite courses change user_id
+#                 except Exception as e:
+#                     raise BadRequest(
+#                         'An error occurred while searching: ' + str(e))
 
-=======
+#         except BadRequest:
+#             raise BadRequest('Invalid request data')
+
 # Endpoint for viewing favourite courses 
->>>>>>> upstream/main
 @app.route('/Viewfavouritecourses', methods=['GET', 'POST'])
 def view_favorite_courses():
     if request.method == 'POST':
@@ -501,11 +496,6 @@ def add_course():
         if not data:
             raise BadRequest('Invalid request data')
 
-<<<<<<< HEAD
-# def down():
-
-
-=======
         with get_db().cursor() as cursor:
             try:
                 # Get Syllabus contents
@@ -754,6 +744,11 @@ def edit_course():
     except BadRequest:
         # Handle invalid request data and return a 400 status code
         return jsonify({'error': 'Invalid request data'}), 400
->>>>>>> upstream/main
+
+    # Endpoint for log out
+    # @app.route('/downloadFile', methods=['POST'])
+    # def downloadPDF():
+    #         return jsonify('PDF');
+
 if __name__ == '__main__':
     app.run()
