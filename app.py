@@ -501,10 +501,10 @@ def add_course():
                 check_query = """
                 SELECT COUNT(*)
                 FROM course
-                WHERE courseCode = %s AND universityID = %s
+                WHERE courseCode = %s AND universityID = %s AND term = %s
                 """
                 cursor.execute(check_query, (data.get(
-                    'courseCode', ''), universityID))
+                    'courseCode', ''), universityID, data.get('term', '')))
                 result = cursor.fetchone()
 
                 # If no existing course is found, proceed with adding it.
