@@ -253,7 +253,7 @@ def searchCourse():
             try:
                 # Check if the courseName match
                 check_query = """
-                    # SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
+                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
                     FROM Users u 
                     LEFT JOIN Professor p ON u.userID = p.userID 
                     LEFT JOIN course c ON p.professorID = c.professorID 
