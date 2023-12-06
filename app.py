@@ -10,6 +10,8 @@ from email.message import EmailMessage
 import os
 import ssl
 import smtplib
+import tempfile
+
 app = Flask(__name__)
 
 # Configure MySQL database connection
@@ -830,40 +832,45 @@ def course_display():
         # Handle invalid request data and return a 400 status code
         return jsonify({'error': 'Invalid request data'}), 400
 
-# Endpoint for user to download syllabus
+
 @app.route('/downloadFile', methods=['POST'])
 def download_syllabus():
     try:
         data = request.get_json()
         courseID = data.get('courseID')
         courseID = courseID.get('courseID')
-        courseID
+        
         if not courseID:
             raise BadRequest('Invalid request data')
-        
+
         with get_db().cursor() as cursor:
-            cursor.execute("SELECT syllabus FROM course WHERE courseID = %s", (courseID,))
+            cursor.execute(
+                "SELECT syllabus FROM course WHERE courseID = %s", (courseID,))
             syllabus_data = cursor.fetchone()
-            
+
             if syllabus_data:
-                temp_file_path = '.download/syllabus.pdf'  
+                # Create a temporary file
+                temp_file, temp_file_path = tempfile.mkstemp(suffix='.pdf')
                 with open(temp_file_path, 'wb') as file:
-                    file.write(syllabus_data)
+                    file.write(syllabus_data[0])
 
                 # Return the file for download
                 response = send_file(temp_file_path, as_attachment=True)
 
+                # Set Content-Disposition header to suggest filename
+                response.headers["Content-Disposition"] = f"attachment; filename=syllabus.pdf"
+
                 # Delete the temporary file after sending
-                os.remove(temp_file_path)
+                os.close(temp_file)
+                os.unlink(temp_file_path)
 
                 return response
             else:
                 return 'Syllabus not found for the given courseID', 404
-            
 
     except Exception as e:
         return str(e), 500
-    
+
 # Endpoint for fetching courses associated with a professor's ID
 @app.route('/ViewCoursesByProfessorID', methods=['GET'])
 def view_courses_by_professor_id():
