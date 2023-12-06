@@ -249,7 +249,6 @@ def search():
         with get_db().cursor() as cursor:
             try:
                 # Check if the courseName match
-                # TODO: make sure only courses from the user's university are being displayed
                 check_query = """
                     SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
                     FROM Users u 
@@ -337,7 +336,7 @@ def view_favorite_courses():
                 ids = [item[0] for item in result_all]
 
                 course_query = """
-                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
+                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID, c.courseID
                     FROM Users u 
                     LEFT JOIN Professor p ON u.userID = p.userID 
                     LEFT JOIN course c ON p.professorID = c.professorID 
@@ -352,11 +351,7 @@ def view_favorite_courses():
                     # Check if the result set is empty
                     if result:
                         res.append(result)
-                    else:
-                        # Handle the case when there is no data for the given course name
-                        res.append(('Unknown', 'Unknown', 'Unknown',
-                                   'Unknown', 'Unknown', 'Unknown'))
-
+                    
                     # Iterate over the outer list of lists
                 for outer_list in res:
                     # Check if the outer list is not empty
@@ -371,14 +366,8 @@ def view_favorite_courses():
                                 'courseName': row[3],
                                 'yearTerm': row[4],
                                 'universityID': row[5],
+                                'courseID': row[6]
                             }
-
-                        # Add the courseID key to the dictionary using the corresponding ID from the ids list
-                        if index < len(ids):
-                            data_dict['courseID'] = ids[index]
-                        else:
-                            # Handle the case when the index is out of bounds for the ids list
-                            data_dict['courseID'] = 'Unknown Course ID'
 
                     # Append the dictionary to the list
                     data_list.append(data_dict)
@@ -704,7 +693,7 @@ def course_display():
         data = request.get_json()
         courseID = data.get('courseID')
         courseID = courseID.get('courseID')
-        #print(courseID)
+
         # Check if the request data is received correctly
         if not data:
             raise BadRequest('Invalid request data')
@@ -764,5 +753,114 @@ def course_display():
     except BadRequest:
         # Handle invalid request data and return a 400 status code
         return jsonify({'error': 'Invalid request data'}), 400
+    
+# Endpoint for fetching courses associated with a professor's ID
+@app.route('/ViewCoursesByProfessorID', methods=['GET'])
+def view_courses_by_professor_id():
+    try:
+        # Get the user ID from the URL parameter
+        user_id = request.args.get('user')
+
+        if not user_id:
+            return jsonify({'error': 'UserID parameter is missing'}), 400
+
+        with get_db().cursor() as cursor:
+            try:
+                # Find the professorID associated with the given userID
+                professor_query = """
+                SELECT professorID FROM Professor
+                WHERE userID = %s
+                """
+                cursor.execute(professor_query, (user_id,))
+                professor_result = cursor.fetchone()
+
+                if not professor_result:
+                    return jsonify({'error': 'No professor found for the given user'}), 404
+
+                professor_id = professor_result[0]
+
+                # Fetch all courses taught by the professor based on professorID
+                courses_query = """
+                SELECT c.courseID, c.courseCode, c.courseName, c.term
+                FROM course c
+                WHERE c.professorID = %s
+                """
+                cursor.execute(courses_query, (professor_id,))
+                courses_result = cursor.fetchall()
+
+                if not courses_result:
+                    return jsonify({'courses': []})
+
+                # Create a list of courses with necessary information
+                courses = [
+                    {
+                        'courseID': row[0],
+                        'courseCode': row[1],
+                        'courseName': row[2],
+                        'term': row[3],
+                    }
+                    for row in courses_result
+                ]
+
+                return jsonify({'courses': courses})
+
+            except Exception as e:
+                return jsonify({'error': 'An error occurred while fetching courses: ' + str(e)}), 500
+
+    except BadRequest:
+        return jsonify({'error': 'Invalid request data'}), 400
+
+@app.route('/removeCourse', methods=['POST'])
+def remove_course():
+    try:
+        # Get user ID and course ID from the URL parameters
+        user_id = request.args.get('userID')
+        course_id = request.args.get('courseID')
+
+        if not user_id or not course_id:
+            return jsonify({'error': 'UserID or CourseID parameter is missing'}), 400
+
+        with get_db().cursor() as cursor:
+            try:
+                # Delete the course record from the database
+                delete_course_query = """
+                DELETE FROM course
+                WHERE courseID = %s AND professorID IS NOT NULL
+                """
+                cursor.execute(delete_course_query, (course_id,))
+                get_db().commit()
+
+                # Check if any rows were affected, indicating a successful deletion
+                if cursor.rowcount == 0:
+                    return jsonify({'error': 'Course not found or not associated with the professor'}), 404
+
+                # Fetch updated list of courses after deletion
+                courses_query = """
+                SELECT c.courseID, c.courseCode, c.courseName, c.term
+                FROM course c
+                WHERE c.professorID = (SELECT professorID FROM Professor WHERE userID = %s)
+                """
+                cursor.execute(courses_query, (user_id,))
+                courses_result = cursor.fetchall()
+
+                # Create a list of courses with necessary information
+                courses = [
+                    {
+                        'courseID': row[0],
+                        'courseCode': row[1],
+                        'courseName': row[2],
+                        'term': row[3],
+                    }
+                    for row in courses_result
+                ]
+
+                return jsonify({'courses': courses})
+
+            except Exception as e:
+                return jsonify({'error': 'An error occurred while deleting the course: ' + str(e)}), 500
+
+    except BadRequest:
+        return jsonify({'error': 'Invalid request data'}), 400
+    
 if __name__ == '__main__':
     app.run()
