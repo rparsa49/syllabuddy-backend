@@ -23,9 +23,7 @@ db_config = {
 }
 
 # Enable CORS for the entire app
-CORS(app, resources={
-     r"/*": {"origins": "https://main--snazzy-smakager-acabe3.netlify.app"}})
-
+CORS(app)
 app.secret_key = "lF!}'dcq4*,BaTH"
 
 # Configure Flask-Login
