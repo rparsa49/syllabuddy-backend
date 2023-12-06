@@ -23,7 +23,8 @@ db_config = {
 }
 
 # Enable CORS for the entire app
-CORS(app)
+CORS(app, resources={
+     r"/*": {"origins": "https://main--snazzy-smakager-acabe3.netlify.app"}})
 
 app.secret_key = "lF!}'dcq4*,BaTH"
 
