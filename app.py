@@ -281,7 +281,6 @@ def searchCourse():
                         'courseName': row[3],
                         'yearTerm': row[4],
                         'universityID': row[5],
-                        # Add the corresponding courseID
                         'courseID': ids[index]
                     }
                     # Append the dictionary to the list
@@ -301,8 +300,8 @@ def searchCourse():
 def searchProfessor():
        try:
            data = request.get_json()
-           professorName = data.get('professorName');
-           [firstName, lastName] = professorName.split(' ');
+           professorName = data.get('professorName')
+           [firstName, lastName] = professorName.split(' ')
 
            print("Received data:", data)
            if not data:
@@ -312,20 +311,14 @@ def searchProfessor():
            with get_db().cursor() as cursor:
                try:
                    # Check if the courseName match
-                   # TODO: make sure only courses from the user's university are being displayed
                    check_query = """
-                       SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, i.universityName
-                       FROM Users u
-                       LEFT JOIN Professor p ON u.userID = p.userID
-                       LEFT JOIN Universities i ON i.universityID = p.universityID
-                       WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;         
+                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID, c.courseID
+                    FROM Users u 
+                    LEFT JOIN Professor p ON u.userID = p.userID 
+                    LEFT JOIN course c ON p.professorID = c.professorID 
+                    WHERE u.firstName = %s and u.lastName = %s;
                    """
-                #    check_query = """
-                #        SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, u.universityID, p.department, p.title
-                #        FROM Users u
-                #        LEFT JOIN Professor p ON u.userID = p.userID
-                #        WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;         
-                #    """
+
                    cursor.execute(check_query,(firstName,lastName))               
                    result = cursor.fetchall()
                    print(result)
@@ -334,15 +327,13 @@ def searchProfessor():
                    for index, row in enumerate(result):
                        # Extracting values from each tuple and creating a dictionary
                        data_dict = {
-                           'userID': row[0],
-                           'firstName': row[1],
-                           'lastName': row[2],
-                           'userType': row[3],
-                           'phoneNumber': row[4],
-                           'email': row[5],
-                           'universityName': row[6],
-                        #    'department': row[7],
-                        #    'title': row[8],
+                           'firstName': row[0],
+                           'lastName': row[1],
+                           'courseCode': row[2],
+                           'courseName': row[3],
+                           'term': row[4],
+                           'universityID': row[5],
+                           'courseID': row[6],
                        }
                        # Append the dictionary to the list
                        data_list.append(data_dict)
