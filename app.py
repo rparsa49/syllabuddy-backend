@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, send_file
 import mysql.connector
 import datetime
 from flask_cors import CORS
@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import BadRequest, Unauthorized, Conflict
 import json
 from email.message import EmailMessage
+import os
 import ssl
 import smtplib
 app = Flask(__name__)
@@ -239,7 +240,7 @@ def logout_user():
 
 # Endpoint for search course
 @app.route('/searchCourse', methods=['POST'])
-def search():
+def searchCourse():
     try:
         data = request.get_json()
         print("Received data:", data)
@@ -250,12 +251,13 @@ def search():
             try:
                 # Check if the courseName match
                 check_query = """
-                    SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
+                    # SELECT u.firstName, u.lastName, c.courseCode, c.courseName, c.term, u.universityID
                     FROM Users u 
                     LEFT JOIN Professor p ON u.userID = p.userID 
                     LEFT JOIN course c ON p.professorID = c.professorID 
                     WHERE c.courseName = %s;
                 """
+                
                 cursor.execute(check_query, (data.get('courseName'),))
                 result = cursor.fetchall()
 
@@ -291,6 +293,69 @@ def search():
 
     except BadRequest:
         raise BadRequest('Invalid request data')
+
+# Endpoint for search professor name
+@app.route('/searchProfessor', methods=['POST'])
+def searchProfessor():
+       try:
+           data = request.get_json()
+           professorName = data.get('professorName');
+           [firstName, lastName] = professorName.split(' ');
+
+           print("Received data:", data)
+           if not data:
+               raise BadRequest('Invalid request data')
+
+
+           with get_db().cursor() as cursor:
+               try:
+                   # Check if the courseName match
+                   # TODO: make sure only courses from the user's university are being displayed
+                   check_query = """
+                       SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, i.universityName
+                       FROM Users u
+                       LEFT JOIN Professor p ON u.userID = p.userID
+                       LEFT JOIN Universities i ON i.universityID = p.universityID
+                       WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;         
+                   """
+                #    check_query = """
+                #        SELECT   u.userID, u.firstName,   u.lastName,   u.userType,   u.phoneNumber,   u.email, u.universityID, p.department, p.title
+                #        FROM Users u
+                #        LEFT JOIN Professor p ON u.userID = p.userID
+                #        WHERE u.userType = "Professor" and u.firstName= %s and u.lastName= %s;         
+                #    """
+                   cursor.execute(check_query,(firstName,lastName))               
+                   result = cursor.fetchall()
+                   print(result)
+                  
+                   data_list = []
+                   for index, row in enumerate(result):
+                       # Extracting values from each tuple and creating a dictionary
+                       data_dict = {
+                           'userID': row[0],
+                           'firstName': row[1],
+                           'lastName': row[2],
+                           'userType': row[3],
+                           'phoneNumber': row[4],
+                           'email': row[5],
+                           'universityName': row[6],
+                        #    'department': row[7],
+                        #    'title': row[8],
+                       }
+                       # Append the dictionary to the list
+                       data_list.append(data_dict)
+
+
+                   return jsonify(data_list)
+
+
+               except Exception as e:
+                   raise BadRequest(
+                       'An error occurred while searching: ' + str(e))
+
+
+       except BadRequest:
+           raise BadRequest('Invalid request data')
 
 # Endpoint for viewing favourite courses 
 @app.route('/Viewfavouritecourses', methods=['GET', 'POST'])
@@ -693,7 +758,6 @@ def course_display():
         data = request.get_json()
         courseID = data.get('courseID')
         courseID = courseID.get('courseID')
-
         # Check if the request data is received correctly
         if not data:
             raise BadRequest('Invalid request data')
@@ -701,7 +765,7 @@ def course_display():
         with get_db().cursor() as cursor:
             try:
                 course_query = """
-                SELECT c.courseCode, c.courseName, c.professorID, c.universityID, c.courseDescription, c.averageGrade, c.tags, c.term
+                SELECT c.courseCode, c.courseName, c.professorID, c.universityID, c.courseDescription, c.averageGrade, c.tags, c.term, c.syllabus
                 FROM course c
                 WHERE courseID = %s
                 """
@@ -714,6 +778,8 @@ def course_display():
                 tags = course_result[0][6]
                 courseDesc = course_result[0][4]
                 terms = course_result[0][7]
+                # courseID = courseID[0][8]
+                # syllabus = course_result[0][8]
 
                 university_query = """
                 SELECT universityName
@@ -733,6 +799,14 @@ def course_display():
                 professor_result = cursor.fetchall()
                 profName = professor_result[0][0] + " " + professor_result[0][1]
 
+                # syllabus_query = """
+                # SELECT syllabus
+                # FROM course
+                # WHERE courseID = %s
+                # """
+                # cursor.execute(syllabus_query, (course_result[0][8],))
+                # syllabus_result = cursor.fetchall()
+                # syllabus = syllabus_result[0][0]
                 return jsonify({
                     'courseName': courseName,
                     'courseCode': courseCode,
@@ -741,7 +815,9 @@ def course_display():
                     'courseDesc': courseDesc,
                     'university': university,
                     'profName': profName,
-                    'terms': terms
+                    'terms': terms,
+                    # 'courseID': courseID,
+                    # 'syllabus': syllabus
                 }), 200
             except Conflict as conflict_error:
                 # Catch the specific Conflict exception and return a 409 status code
@@ -753,6 +829,40 @@ def course_display():
     except BadRequest:
         # Handle invalid request data and return a 400 status code
         return jsonify({'error': 'Invalid request data'}), 400
+
+# Endpoint for user to download syllabus
+@app.route('/downloadFile', methods=['POST'])
+def download_syllabus():
+    try:
+        data = request.get_json()
+        courseID = data.get('courseID')
+        courseID = courseID.get('courseID')
+        courseID
+        if not courseID:
+            raise BadRequest('Invalid request data')
+        
+        with get_db().cursor() as cursor:
+            cursor.execute("SELECT syllabus FROM course WHERE courseID = %s", (courseID,))
+            syllabus_data = cursor.fetchone()
+            
+            if syllabus_data:
+                temp_file_path = '.download/syllabus.pdf'  
+                with open(temp_file_path, 'wb') as file:
+                    file.write(syllabus_data)
+
+                # Return the file for download
+                response = send_file(temp_file_path, as_attachment=True)
+
+                # Delete the temporary file after sending
+                os.remove(temp_file_path)
+
+                return response
+            else:
+                return 'Syllabus not found for the given courseID', 404
+            
+
+    except Exception as e:
+        return str(e), 500
     
 # Endpoint for fetching courses associated with a professor's ID
 @app.route('/ViewCoursesByProfessorID', methods=['GET'])
